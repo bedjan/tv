@@ -4,6 +4,8 @@
 
 [Bombuj](https://www.bombuj.si/)
 
+[Film zadara](https://filmyzadara.cz/)
+
 [Serial zadara](https://serialyzadara.cz/)
 
 [Filmy zadara](https://filmyzadara.cz/)
@@ -19,3 +21,5 @@
 [Dupe seriály](https://dupe.cz/serialy/)
 
 [Seriálzone](https://www.serialzone.cz/serialy/)
+
+[Youtube](https://www.youtube.com)
