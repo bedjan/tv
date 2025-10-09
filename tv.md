@@ -6,8 +6,8 @@
 
 [Hellspy](https://www.hellspy.to/)
 
-<podrobnosti>
-<shrnutí>Odkazy</shrnutí>
+<details>
+<summary>Odkazy</summary>
 <br />
   
 [Zkracene tv](https://rdy.cz/tv)
