@@ -1,6 +1,7 @@
 <details>
 <summary>Odkazy</summary>
-
+<br />
+  
 [Zkracene tv](https://rdy.cz/tv)
 
 [Mrkaj si](https://mrkaj.si/)
