@@ -18,6 +18,8 @@
 
 [Serial zadara](https://serialyzadara.cz/)
 
+[Prehraj to](https://tv.prehraj.me/cs/)
+
 [Filmy zadara](https://filmyzadara.cz/)
 
 [Mrkaj si - pernik. táta](https://mrkaj.si/tv/breaking-bad/S01E01)
