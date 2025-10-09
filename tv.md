@@ -30,7 +30,7 @@
 
 [Seriálzone](https://www.serialzone.cz/serialy/)
 
-
+[Sleduj seriály](https://sledujserialy.io/)
 
 </details>
 
