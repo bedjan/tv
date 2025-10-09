@@ -4,6 +4,10 @@
 
 [Bombuj](https://www.bombuj.si/)
 
+[Serial zadara](https://serialyzadara.cz/)
+
+[Filmy zadara](https://filmyzadara.cz/)
+
 [Mrkaj si - pernik. táta](https://mrkaj.si/tv/breaking-bad/S01E01)
 
 [Nejseriály](https://www.najserialy.io/)
