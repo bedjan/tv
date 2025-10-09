@@ -26,6 +26,11 @@
 
 [Seriálzone](https://www.serialzone.cz/serialy/)
 
-[Youtube](https://www.youtube.com)
+
 
 </details>
+
+[Youtube](https://www.youtube.com)
+
+[Iprima](https://www.iprima.cz/)
+
