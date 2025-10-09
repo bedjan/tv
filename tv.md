@@ -2,6 +2,8 @@
 
 [Iprima](https://www.iprima.cz/)
 
+[Sledování TV](https://sledovanitv.cz/)
+
 <details>
 <summary>Odkazy</summary>
 <br />
