@@ -8,4 +8,6 @@
 
 [Naj seriály](https://www.najserialy.io/?page=7)
 
+[Seriálzone](https://www.serialzone.cz/serialy/)
+
 [Dupe seriály](https://dupe.cz/serialy/)
