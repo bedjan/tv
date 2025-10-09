@@ -34,6 +34,8 @@
 
 [Sleduj seriály](https://sledujserialy.io/)
 
+[Iprima Pad](https://www.iprima.cz/serialy/pad)
+
 </details>
 
 
