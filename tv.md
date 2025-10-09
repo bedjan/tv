@@ -1,8 +1,8 @@
-[Youtube](https://www.youtube.com){:target="_blank"}
+[Youtube](https://www.youtube.com)
 
-[Iprima](https://www.iprima.cz/){:target="_blank"}
+[Iprima](https://www.iprima.cz/)
 
-[Sledování TV](https://sledovanitv.cz/){:target="_blank"}
+[Sledování TV](https://sledovanitv.cz/)
 
 <details>
 <summary>Odkazy</summary>
