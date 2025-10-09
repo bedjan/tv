@@ -1,5 +1,7 @@
 [Zkracene tv](https://rdy.cz/tv)
 
+[Bombuj](https://www.bombuj.si/)
+
 [Seriály zadara](https://serialyzadara.cz/)
 
 [Mrkaj si](https://mrkaj.si/)
