@@ -1,3 +1,6 @@
+<details>
+<summary>Odkazy</summary>
+
 [Zkracene tv](https://rdy.cz/tv)
 
 [Mrkaj si](https://mrkaj.si/)
@@ -23,3 +26,5 @@
 [Seriálzone](https://www.serialzone.cz/serialy/)
 
 [Youtube](https://www.youtube.com)
+
+</details>
