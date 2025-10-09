@@ -4,8 +4,10 @@
 
 [Sledování TV](https://sledovanitv.cz/)
 
-<details>
-<summary>Odkazy</summary>
+[Hellspy](https://www.hellspy.to/)
+
+<podrobnosti>
+<shrnutí>Odkazy</shrnutí>
 <br />
   
 [Zkracene tv](https://rdy.cz/tv)
@@ -14,11 +16,11 @@
 
 [Bombuj](https://www.bombuj.si/)
 
-[Film zadara](https://filmyzadara.cz/)
+[Filmová zadara](https://filmyzadara.cz/)
 
-[Serial zadara](https://serialyzadara.cz/)
+[Sériová zadara](https://serialyzadara.cz/)
 
-[Prehraj to](https://tv.prehraj.me/cs/)
+[Přehraj to](https://tv.prehraj.me/cs/)
 
 [Filmy zadara](https://filmyzadara.cz/)
 
