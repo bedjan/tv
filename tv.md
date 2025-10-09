@@ -7,3 +7,5 @@
 [Mrkaj si - pernik. táta](https://mrkaj.si/tv/breaking-bad/S01E01)
 
 [Naj seriály](https://www.najserialy.io/?page=7)
+
+[Dupe seriály](https://dupe.cz/serialy/)
