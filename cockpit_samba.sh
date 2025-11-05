@@ -1,6 +1,5 @@
 #!/bin/bash
-# Skript pro instalaci Cockpit, pluginu pro sdílení souborů a konfiguraci Samby
-# na MX Linux (Debian-based)
+# Kompletní skript pro instalaci Cockpit, Samby, konfigurace sdílení a přidání Microsoft repozitáře.
 
 # Nastavení barvy pro hlášky
 GREEN='\033[0;32m'
@@ -8,33 +7,60 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# --- FUNKCE ---
+
 # Funkce pro bezpečné zjištění IP adresy
 get_server_ip() {
-    # Pokus 1: Standardní a čistý způsob
     IP_ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}')
-    
-    # Pokus 2: Pokud hostname nefunguje, použijeme ip
     if [ -z "$IP_ADDRESS" ]; then
-        # Hledáme IP V4, která není loopback (127.0.0.1)
         IP_ADDRESS=$(ip a 2>/dev/null | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | head -n 1)
     fi
-    
     echo "$IP_ADDRESS"
 }
+
 # ----------------------------------------------------------------------
 
 echo -e "${GREEN}### 1. Aktualizace systému a instalace základních balíčků ###${NC}"
 sudo apt update || { echo -e "${RED}Chyba při aktualizaci repozitářů!${NC}"; exit 1; }
 sudo apt upgrade -y
-sudo apt install -y curl nano
+# Přidání apt-transport-https pro MS repo
+sudo apt install -y curl nano apt-transport-https wget
 
-echo -e "${GREEN}### 2. Instalace Cockpit Web Konsole a sluzeb ###${NC}"
+# --- ZAČÁTEK SEKCE MICROSOFT REPO ---
+echo -e "${GREEN}### 2. Přidání Microsoft Repozitáře (pro Debian 11/Bullseye) ###${NC}"
+
+# Zjištění kódového jména Debianu, na kterém je MX Linux založen
+DISTRO_CODENAME=$(cat /etc/os-release 2>/dev/null | grep VERSION_CODENAME | cut -d= -f2)
+
+if [ -z "$DISTRO_CODENAME" ]; then
+    # Default pro novější MX Linux
+    DISTRO_CODENAME="bullseye"
+fi
+
+echo -e "Detekované kódové jméno Debianu: ${YELLOW}$DISTRO_CODENAME${NC}"
+
+# Import GPG klíče
+echo -e "Import GPG klíče Microsoftu..."
+curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
+sudo install -o root -g root -m 644 microsoft.gpg /etc/apt/trusted.gpg.d/
+rm microsoft.gpg
+
+# Přidání repozitáře
+echo -e "Přidání repozitáře pro Microsoft balíčky..."
+echo "deb [arch=amd64] https://packages.microsoft.com/debian/11/prod $DISTRO_CODENAME main" | sudo tee /etc/apt/sources.list.d/microsoft-prod.list > /dev/null
+
+echo -e "Aktualizace seznamu balíčků po přidání repozitáře..."
+sudo apt update || echo -e "${YELLOW}Upozornění: Po přidání MS repozitáře se objevily problémy. Zkuste spustit 'sudo apt update' znovu ručně.${NC}"
+
+# --- KONEC SEKCE MICROSOFT REPO ---
+# ----------------------------------------------------------------------
+
+echo -e "${GREEN}### 3. Instalace Cockpit Web Konsole a sluzeb pro Sdílení ###${NC}"
 sudo apt install -y cockpit samba nfs-kernel-server
 sudo systemctl enable --now cockpit.socket
 
-# Zjištění IP adresy (zavolání opravené funkce)
+# Zjištění IP adresy pro informaci o přístupu
 SERVER_IP=$(get_server_ip)
-
 if [ -z "$SERVER_IP" ]; then
     SERVER_ACCESS_INFO="<IP_ADRESA_SERVERU>"
 else
@@ -45,12 +71,11 @@ echo -e "${GREEN}Cockpit je spuštěn a dostupný na https://$SERVER_ACCESS_INFO
 
 # ----------------------------------------------------------------------
 
-echo -e "${GREEN}### 3. Instalace pluginu cockpit-file-sharing ###${NC}"
-# Tato sekce automaticky zjišťuje a stahuje nejnovější DEB balíček
+echo -e "${GREEN}### 4. Instalace pluginu cockpit-file-sharing ###${NC}"
 LATEST_DEB_URL=$(curl -s https://api.github.com/repos/45Drives/cockpit-file-sharing/releases/latest | grep "browser_download_url" | grep "focal_all.deb" | cut -d : -f 2,3 | tr -d \" | sed 's/ //g')
 
 if [ -z "$LATEST_DEB_URL" ]; then
-    echo -e "${RED}Nepodařilo se najít odkaz na nejnovější DEB balíček! Pokračuji bez něj.${NC}"
+    echo -e "${YELLOW}Upozornění: Nepodařilo se najít odkaz na nejnovější DEB balíček pro file-sharing. Plugin nebude nainstalován.${NC}"
 else
     TEMP_DEB_FILE="/tmp/cockpit-file-sharing.deb"
     echo -e "Stahování: $LATEST_DEB_URL"
@@ -61,19 +86,26 @@ else
     rm "$TEMP_DEB_FILE"
 fi
 
-echo -e "${GREEN}### 4. Konfigurace Samby (smb.conf) pro domovské a USB disky ###${NC}"
+# ----------------------------------------------------------------------
+
+echo -e "${GREEN}### 5. Konfigurace Samby (smb.conf) pro domovské a USB disky ###${NC}"
 SAMBA_CONF="/etc/samba/smb.conf"
 CONFIG_LINE_REGISTRY="include = registry"
 
-# 4a. Povolení pluginu v globální sekci
+# 5a. Povolení pluginu v globální sekci
 if ! grep -q "$CONFIG_LINE_REGISTRY" "$SAMBA_CONF"; then
     echo "Pridavam 'include = registry' pro kompatibilitu s Cockpit pluginem."
-    # Přidání pod sekci [global]
     sudo sed -i '/^\[global\]/a\    include = registry' "$SAMBA_CONF"
 fi
 
-# 4b. Přidání sekce [homes] a [USB-disky]
-echo "Pridavam konfiguraci pro automaticke sdileni [homes] a [USB-disky]."
+# 5b. Přidání sekce [homes] a [USB-disky] (Přepisuje stávající konfiguraci, aby nedošlo k duplikaci)
+echo "Přepisuji/Přidávám konfiguraci pro sdílení [homes] a [USB-disky] na konec souboru."
+
+# Použijeme dočasný soubor, abychom odstranili staré [homes] a [USB-disky] sekce, a přidáme nové.
+# Je to bezpečnější než jen připojit na konec, aby nedošlo k duplikaci.
+sudo sed -i '/^\[homes\]/,/^$/d' "$SAMBA_CONF"
+sudo sed -i '/^\[USB-disky\]/,/^$/d' "$SAMBA_CONF"
+
 sudo tee -a "$SAMBA_CONF" > /dev/null << EOF
 
 # =======================================================
@@ -103,20 +135,19 @@ sudo tee -a "$SAMBA_CONF" > /dev/null << EOF
     force group = nogroup
 EOF
 
-echo -e "${GREEN}### 5. Restart Samba služby ###${NC}"
+echo -e "${GREEN}### 6. Restart Samba služby ###${NC}"
 sudo systemctl restart smbd
 echo -e "${GREEN}Samba služba restartována.${NC}"
 
-echo -e "${YELLOW}### DŮLEŽITÉ UPOZORNĚNÍ K USB DISKŮM A 'usbmount' ###${NC}"
-echo "Balíček 'usbmount' není na moderních desktopových distribucích jako MX Linux potřeba."
-echo "MX Linux používá pro automatické připojování (auto-mounting) diskových jednotek"
-echo "jiné nástroje, které připojují disky do složky ${RED}/media/<vase_jmeno>/${NC}."
-echo "Konfigurace [USB-disky] sdílí celou složku ${RED}/media${NC}, což by mělo zajistit přístup"
-echo "ke všem připojeným diskům, jak jste si přál."
-echo -e "${YELLOW}Pro funkční zápis na sdílené USB disky se ujistěte, že je disk naformátován na systém souborů (jako např. FAT32 nebo NTFS), který respektuje jednoduchá oprávnění, nebo že se připojená jednotka automaticky mountuje s oprávněním pro zápis pro všechny.${NC}"
+# ----------------------------------------------------------------------
 
+echo -e "${YELLOW}### KONEČNÁ KONTROLA A UPOZORNĚNÍ ###${NC}"
+echo "1. ${RED}Uživatelé Samby:${NC} Nezapomeňte vytvořit Samba heslo pro uživatele, kteří mají přistupovat k [homes] sdílení:"
+echo "   -> ${RED}sudo smbpasswd -a <vase_jmeno_uzivatele>${NC}"
+echo "2. ${RED}USB disky:${NC} Jsou sdíleny přes /media. Pro plný zápis musí mít připojené disky správná oprávnění."
+echo ""
 echo -e "${GREEN}======================================================${NC}"
-echo -e "${GREEN}✅ Instalace a konfigurace DOKONČENA!${NC}"
+echo -e "${GREEN}✅ INSTALACE A KONFIGURACE DOKONČENA!${NC}"
 echo -e "${GREEN}======================================================${NC}"
 echo "Přístup k webové konzoli pro grafickou správu:"
 echo -e "   -> ${RED}https://$SERVER_ACCESS_INFO:9090${NC}"
