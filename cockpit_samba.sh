@@ -16,7 +16,21 @@ sudo apt install -y curl nano
 echo -e "${GREEN}### 2. Instalace Cockpit Web Konsole a sluzeb ###${NC}"
 sudo apt install -y cockpit samba nfs-kernel-server
 sudo systemctl enable --now cockpit.socket
-echo -e "${GREEN}Cockpit je spuštěn a dostupný na https://<IP_ADRESA>:9090${NC}"
+
+# >>> OPRAVENÁ ČÁST PRO ŘÁDEK 10 (nebo blízko něj)
+SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+if [ -z "$SERVER_IP" ]; then
+    SERVER_IP=$(ip a 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d/ -f1 | head -n 1)
+fi
+
+if [ -z "$SERVER_IP" ]; then
+    SERVER_ACCESS_INFO="<IP_ADRESA_SERVERU>"
+else
+    SERVER_ACCESS_INFO="$SERVER_IP"
+fi
+
+echo -e "${GREEN}Cockpit je spuštěn a dostupný na https://$SERVER_ACCESS_INFO:9090${NC}"
+# <<< KONEC OPRAVY
 
 echo -e "${GREEN}### 3. Instalace pluginu cockpit-file-sharing ###${NC}"
 # Tato sekce automaticky zjišťuje a stahuje nejnovější DEB balíček
@@ -45,7 +59,7 @@ if ! grep -q "$CONFIG_LINE_REGISTRY" "$SAMBA_CONF"; then
     sudo sed -i '/^\[global\]/a\    include = registry' "$SAMBA_CONF"
 fi
 
-# 4b. Přidání sekce [homes] pro automatické sdílení domovských adresářů
+# 4b. Přidání sekce [homes] a [USB-disky]
 echo "Pridavam konfiguraci pro automaticke sdileni [homes] a [USB-disky]."
 sudo tee -a "$SAMBA_CONF" > /dev/null << EOF
 
@@ -92,7 +106,7 @@ echo -e "${GREEN}======================================================${NC}"
 echo -e "${GREEN}✅ Instalace a konfigurace DOKONČENA!${NC}"
 echo -e "${GREEN}======================================================${NC}"
 echo "Přístup k webové konzoli pro grafickou správu:"
-echo -e "   -> ${RED}https://<IP_ADRESA_VAŠEHO_SERVERU>:9090${NC}"
+echo -e "   -> ${RED}https://$SERVER_ACCESS_INFO:9090${NC}"
 echo "Připojení k Samba sdílení:"
-echo "   -> Domovský adresář: \\\\<IP_ADRESA_SERVERU>\\<vase_jmeno_uzivatele>"
-echo "   -> USB disky: \\\\<IP_ADRESA_SERVERU>\\USB-disky"
+echo "   -> Domovský adresář: \\\\$SERVER_ACCESS_INFO\\<vase_jmeno_uzivatele>"
+echo "   -> USB disky: \\\\$SERVER_ACCESS_INFO\\USB-disky"
