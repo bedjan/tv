@@ -1,147 +1,98 @@
 #!/bin/bash
+# Skript pro instalaci Cockpit, pluginu pro sdílení souborů a konfiguraci Samby
+# na MX Linux (Debian-based)
 
-# --- Nastavení proměnných ---
-SYSTEM_USER="d" 
-HOME_SHARE_NAME="home_${SYSTEM_USER}"
-HOME_SHARE_PATH="/home/${SYSTEM_USER}/NAS_Sdileny"
-SAMBA_USER="${SYSTEM_USER}" # Používáme systémového uživatele jako Samba uživatele
+# Nastavení barvy pro hlášky
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-# --- Nastavení USB Auto-Share ---
-USB_SHARE_SCRIPT="/usr/local/bin/usb_samba_share.sh"
-SMB_CONF="/etc/samba/smb.conf"
-SHARE_NAME_PREFIX="USB-DISK-"
-SAMBA_GROUP="samba_users"
+echo -e "${GREEN}### 1. Aktualizace systému a instalace základních balíčků ###${NC}"
+sudo apt update || { echo -e "${RED}Chyba při aktualizaci repozitářů!${NC}"; exit 1; }
+sudo apt upgrade -y
+sudo apt install -y curl nano
 
-# --- Zkontrolovat, zda skript běží jako root ---
-if [ "$EUID" -ne 0 ]; then
-  echo "Tento skript musí být spuštěn s právy root (sudo)."
-  exit 1
-fi
+echo -e "${GREEN}### 2. Instalace Cockpit Web Konsole a sluzeb ###${NC}"
+sudo apt install -y cockpit samba nfs-kernel-server
+sudo systemctl enable --now cockpit.socket
+echo -e "${GREEN}Cockpit je spuštěn a dostupný na https://<IP_ADRESA>:9090${NC}"
 
-echo "🚀 Spouštím kompletní instalaci NAS (Cockpit, Samba, Home Share, Auto-USB Share) na MX Linux."
+echo -e "${GREEN}### 3. Instalace pluginu cockpit-file-sharing ###${NC}"
+# Tato sekce automaticky zjišťuje a stahuje nejnovější DEB balíček
+LATEST_DEB_URL=$(curl -s https://api.github.com/repos/45Drives/cockpit-file-sharing/releases/latest | grep "browser_download_url" | grep "focal_all.deb" | cut -d : -f 2,3 | tr -d \" | sed 's/ //g')
 
-# 1. Kontrola uživatele 'd' a skupiny
-echo "1/7: Kontroluji uživatele a skupiny..."
-if ! id "${SYSTEM_USER}" &>/dev/null; then
-    echo "🚨 Chyba: Systémový uživatel '${SYSTEM_USER}' nebyl nalezen. Skript končí."
-    exit 1
-fi
-groupadd "${SAMBA_GROUP}" 2>/dev/null
-usermod -aG "${SAMBA_GROUP}" "${SAMBA_USER}"
-
-# 2. Aktualizace a Instalace softwaru
-echo "2/7: Aktualizuji a instaluji balíčky (Cockpit, Samba, File Sharing, usbmount)..."
-apt update -y
-# Instalace hlavních balíčků
-apt install -y cockpit samba cockpit-file-sharing usbmount
-# usbmount pro automatické připojení USB disků do /media/usbX
-
-# 3. Vytvoření a nastavení Home Share
-echo "3/7: Vytvářím trvalou sdílenou složku: ${HOME_SHARE_PATH}"
-mkdir -p "${HOME_SHARE_PATH}"
-chown -R "${SYSTEM_USER}":"${SYSTEM_USER}" "${HOME_SHARE_PATH}"
-chmod -R 770 "${HOME_SHARE_PATH}"
-
-# Konfigurace trvalého Home Share v Sambě (ručně, aby to fungovalo okamžitě)
-echo "   -> Konfiguruji trvalé sdílení v ${SMB_CONF}"
-cat <<EOF >> $SMB_CONF
-
-[${HOME_SHARE_NAME}]
-    comment = Home Share for ${SYSTEM_USER}
-    path = ${HOME_SHARE_PATH}
-    read only = no
-    guest ok = no
-    browsable = yes
-    valid users = @${SAMBA_GROUP}
-    create mask = 0770
-    directory mask = 0770
-EOF
-
-# 4. Nastavení hesla Samby
-echo "4/7: Nastavuji heslo pro samba uživatele (${SAMBA_USER})."
-echo "Zadejte heslo pro samba uživatele (${SAMBA_USER}):"
-smbpasswd -a "${SAMBA_USER}"
-
-# 5. Vytvoření Skriptu pro Auto-Sdílení USB disků
-echo "5/7: Vytvářím skript pro automatické sdílení USB disků: ${USB_SHARE_SCRIPT}"
-cat <<'EOF' > "${USB_SHARE_SCRIPT}"
-#!/bin/bash
-# Skript pro automatické přidání/odebrání sdílené složky Samby.
-
-SMB_CONF="/etc/samba/smb.conf"
-SHARE_NAME_PREFIX="USB-DISK-"
-
-ACTION="$1"
-DEVICE_DIR="$2"
-
-DEVICE_NAME=$(basename "$DEVICE_DIR")
-SHARE_NAME="${SHARE_NAME_PREFIX}${DEVICE_NAME}"
-
-if [ "$ACTION" = "add" ]; then
-    echo "PŘIPOJENÍ: Přidávám sdílení pro $DEVICE_DIR"
+if [ -z "$LATEST_DEB_URL" ]; then
+    echo -e "${RED}Nepodařilo se najít odkaz na nejnovější DEB balíček! Pokračuji bez něj.${NC}"
+else
+    TEMP_DEB_FILE="/tmp/cockpit-file-sharing.deb"
+    echo -e "Stahování: $LATEST_DEB_URL"
+    curl -Lo "$TEMP_DEB_FILE" "$LATEST_DEB_URL"
     
-    # --- Zápis do smb.conf ---
-    cat <<EOT >> $SMB_CONF
-
-[${SHARE_NAME}]
-    comment = USB External Drive ${DEVICE_NAME}
-    path = ${DEVICE_DIR}
-    read only = no
-    guest ok = no
-    browsable = yes
-    valid users = @samba_users
-    create mask = 0770
-    directory mask = 0770
-EOT
-
-    # Zajištění přístupu po připojení usbmountem
-    chmod -R 777 "${DEVICE_DIR}"
-    
-    systemctl restart smbd
-
-elif [ "$ACTION" = "remove" ]; then
-    echo "ODPOJENÍ: Odebírám sdílení pro $DEVICE_DIR"
-
-    # Odstranění sekce z smb.conf
-    sed -i "/^\[${SHARE_NAME}\]/,/^$/d" $SMB_CONF
-    sed -i '/^$/N;/^\n$/D' $SMB_CONF # Čištění prázdných řádků
-
-    systemctl restart smbd
+    echo "Instalace staženého DEB balíčku..."
+    sudo apt install -y "$TEMP_DEB_FILE" || { echo -e "${RED}Chyba při instalaci DEB balíčku!${NC}"; exit 1; }
+    rm "$TEMP_DEB_FILE"
 fi
+
+echo -e "${GREEN}### 4. Konfigurace Samby (smb.conf) pro domovské a USB disky ###${NC}"
+SAMBA_CONF="/etc/samba/smb.conf"
+CONFIG_LINE_REGISTRY="include = registry"
+
+# 4a. Povolení pluginu v globální sekci
+if ! grep -q "$CONFIG_LINE_REGISTRY" "$SAMBA_CONF"; then
+    echo "Pridavam 'include = registry' pro kompatibilitu s Cockpit pluginem."
+    # Přidání pod sekci [global]
+    sudo sed -i '/^\[global\]/a\    include = registry' "$SAMBA_CONF"
+fi
+
+# 4b. Přidání sekce [homes] pro automatické sdílení domovských adresářů
+echo "Pridavam konfiguraci pro automaticke sdileni [homes] a [USB-disky]."
+sudo tee -a "$SAMBA_CONF" > /dev/null << EOF
+
+# =======================================================
+# SEKCE PŘIDANÉ PRO COCKPIT A AUTOMATICKÉ SDÍLENÍ
+# =======================================================
+
+[homes]
+    comment = Home Directories
+    browseable = no
+    read only = no
+    create mask = 0600
+    directory mask = 0700
+    valid users = %S
+    writable = yes
+    
+[USB-disky]
+    comment = Pripojene USB disky a media
+    path = /media
+    browseable = yes
+    read only = no
+    guest ok = yes
+    writable = yes
+    public = yes
+    create mask = 0777
+    directory mask = 0777
+    force user = nobody
+    force group = nogroup
 EOF
 
-# Nastavení oprávnění pro skript
-chmod +x "${USB_SHARE_SCRIPT}"
+echo -e "${GREEN}### 5. Restart Samba služby ###${NC}"
+sudo systemctl restart smbd
+echo -e "${GREEN}Samba služba restartována.${NC}"
 
-# 6. Vytvoření Pravidla UDEV
-echo "6/7: Vytvářím pravidlo udev pro spouštění skriptu při připojení USB disku."
-UDEV_RULES_FILE="/etc/udev/rules.d/99-usb-samba.rules"
-cat <<EOF > "${UDEV_RULES_FILE}"
-# Spustit náš skript, když se připojí/odpojí zařízení USB (cílí na adresáře /media/usbX od usbmount)
-ACTION=="add", SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", KERNEL=="sd[a-z][0-9]", RUN+="${USB_SHARE_SCRIPT} add /media/%k"
-ACTION=="remove", SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", KERNEL=="sd[a-z][0-9]", RUN+="${USB_SHARE_SCRIPT} remove /media/%k"
-EOF
+echo -e "${YELLOW}### DŮLEŽITÉ UPOZORNĚNÍ K USB DISKŮM A 'usbmount' ###${NC}"
+echo "Balíček 'usbmount' není na moderních desktopových distribucích jako MX Linux potřeba."
+echo "MX Linux používá pro automatické připojování (auto-mounting) diskových jednotek"
+echo "jiné nástroje (UDisks/GVFS/Thunar), které připojují disky do složky ${RED}/media/<vase_jmeno>/${NC}."
+echo "Konfigurace [USB-disky] sdílí celou složku ${RED}/media${NC}, což by mělo zajistit přístup"
+echo "ke všem připojeným diskům, jak jste si přál."
+echo -e "${YELLOW}Pro funkční zápis na sdílené USB disky se ujistěte, že je disk naformátován na systém souborů (jako např. FAT32 nebo NTFS), který respektuje jednoduchá oprávnění, nebo že se připojená jednotka automaticky mountuje s oprávněním pro zápis pro všechny (jak je obvyklé).${NC}"
 
-# Aktivace pravidel udev
-udevadm control --reload-rules
-udevadm trigger
-
-# 7. Spuštění a Restart služeb
-echo "7/7: Povoluji a restartuji služby Cockpit a Samba."
-systemctl restart samba
-systemctl enable cockpit.socket
-systemctl start cockpit.socket
-
-# --- Dokončení ---
-echo ""
-echo "✅ Instalace DOKONČENA!"
-echo ""
-echo "--- Přístupové body ---"
-echo "1. WEB GUI (Cockpit): https://$(hostname -I | awk '{print $1}'):9090"
-echo "   -> Přihlášení: Systémový uživatel '${SYSTEM_USER}' a jeho heslo."
-echo "2. TRVALÉ SDÍLENÍ: \\\\$(hostname -I | awk '{print $1}')\\${HOME_SHARE_NAME}"
-echo "   -> Cesta: ${HOME_SHARE_PATH}"
-echo "3. USB SDÍLENÍ: \\\\$(hostname -I | awk '{print $1}')\\USB-DISK-usb[0-9]"
-echo "   -> Automaticky se objeví po připojení USB disku."
-echo "   -> Přihlášení k Sambě: Uživatel '${SAMBA_USER}' a jeho Samba heslo."
-echo "-------------------"
+echo -e "${GREEN}======================================================${NC}"
+echo -e "${GREEN}✅ Instalace a konfigurace DOKONČENA!${NC}"
+echo -e "${GREEN}======================================================${NC}"
+echo "Přístup k webové konzoli pro grafickou správu:"
+echo -e "   -> ${RED}https://<IP_ADRESA_VAŠEHO_SERVERU>:9090${NC}"
+echo "Připojení k Samba sdílení:"
+echo "   -> Domovský adresář: \\\\<IP_ADRESA_SERVERU>\\<vase_jmeno_uzivatele>"
+echo "   -> USB disky: \\\\<IP_ADRESA_SERVERU>\\USB-disky"
