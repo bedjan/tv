@@ -66,4 +66,60 @@ SAMBA_CONF="/etc/samba/smb.conf"
 CONFIG_LINE_REGISTRY="include = registry"
 
 # 4a. Povolení pluginu v globální sekci
-if ! grep -q "$CONFIG_LINE_REGISTRY" "$SAMBA_CONF
+if ! grep -q "$CONFIG_LINE_REGISTRY" "$SAMBA_CONF"; then
+    echo "Pridavam 'include = registry' pro kompatibilitu s Cockpit pluginem."
+    # Přidání pod sekci [global]
+    sudo sed -i '/^\[global\]/a\    include = registry' "$SAMBA_CONF"
+fi
+
+# 4b. Přidání sekce [homes] a [USB-disky]
+echo "Pridavam konfiguraci pro automaticke sdileni [homes] a [USB-disky]."
+sudo tee -a "$SAMBA_CONF" > /dev/null << EOF
+
+# =======================================================
+# SEKCE PŘIDANÉ PRO COCKPIT A AUTOMATICKÉ SDÍLENÍ
+# =======================================================
+
+[homes]
+    comment = Home Directories
+    browseable = no
+    read only = no
+    create mask = 0600
+    directory mask = 0700
+    valid users = %S
+    writable = yes
+    
+[USB-disky]
+    comment = Pripojene USB disky a media
+    path = /media
+    browseable = yes
+    read only = no
+    guest ok = yes
+    writable = yes
+    public = yes
+    create mask = 0777
+    directory mask = 0777
+    force user = nobody
+    force group = nogroup
+EOF
+
+echo -e "${GREEN}### 5. Restart Samba služby ###${NC}"
+sudo systemctl restart smbd
+echo -e "${GREEN}Samba služba restartována.${NC}"
+
+echo -e "${YELLOW}### DŮLEŽITÉ UPOZORNĚNÍ K USB DISKŮM A 'usbmount' ###${NC}"
+echo "Balíček 'usbmount' není na moderních desktopových distribucích jako MX Linux potřeba."
+echo "MX Linux používá pro automatické připojování (auto-mounting) diskových jednotek"
+echo "jiné nástroje, které připojují disky do složky ${RED}/media/<vase_jmeno>/${NC}."
+echo "Konfigurace [USB-disky] sdílí celou složku ${RED}/media${NC}, což by mělo zajistit přístup"
+echo "ke všem připojeným diskům, jak jste si přál."
+echo -e "${YELLOW}Pro funkční zápis na sdílené USB disky se ujistěte, že je disk naformátován na systém souborů (jako např. FAT32 nebo NTFS), který respektuje jednoduchá oprávnění, nebo že se připojená jednotka automaticky mountuje s oprávněním pro zápis pro všechny.${NC}"
+
+echo -e "${GREEN}======================================================${NC}"
+echo -e "${GREEN}✅ Instalace a konfigurace DOKONČENA!${NC}"
+echo -e "${GREEN}======================================================${NC}"
+echo "Přístup k webové konzoli pro grafickou správu:"
+echo -e "   -> ${RED}https://$SERVER_ACCESS_INFO:9090${NC}"
+echo "Připojení k Samba sdílení:"
+echo "   -> Domovský adresář: \\\\$SERVER_ACCESS_INFO\\<vase_jmeno_uzivatele>"
+echo "   -> USB disky: \\\\$SERVER_ACCESS_INFO\\USB-disky"
